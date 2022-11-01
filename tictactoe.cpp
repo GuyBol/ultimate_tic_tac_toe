@@ -262,11 +262,11 @@ int main()
     G_myDisplay = "X";
     G_enemyDisplay = "O";
 
-    /*testGetWinner();
+    testGetWinner();
     testPositionMask();
     testPositionMaskCounters();
     testGetAllowedMoves();
-    testMctsFinalize();*/
+    testMctsFinalize();
 
     testMctsPerf();
 

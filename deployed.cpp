@@ -11,6 +11,7 @@
 #include <vector>
 #include <array>
 #include <list>
+#include <map>
 #include <algorithm>
 #include <ctime>
 #include <cmath>
@@ -132,14 +133,18 @@ public:
     // Get the (x,y) coordinate within subgrid from a subgrid mask
     static Position GetPositionFromSubMask(uint64_t mask)
     {
-        for (int i = 0; i < 9; i++)
-        {
-            if ((mask & (1 << i)) == (1 << i))
-            {
-                return Position(i%3, i/3);
-            }
-        }
-        return Position(-1,-1);
+        static map<uint64_t, Position> mapping = {
+            {0b1,           Position(0,0)},
+            {0b10,          Position(1,0)},
+            {0b100,         Position(2,0)},
+            {0b1000,        Position(0,1)},
+            {0b10000,       Position(1,1)},
+            {0b100000,      Position(2,1)},
+            {0b1000000,     Position(0,2)},
+            {0b10000000,    Position(1,2)},
+            {0b100000000,   Position(2,2)}
+            };
+        return mapping[mask];
     }
 
     // Get the nth set bit in a uint64_t starting from the left (most significant bit)
