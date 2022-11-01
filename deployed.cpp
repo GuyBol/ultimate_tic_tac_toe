@@ -660,7 +660,16 @@ public:
         return _parent == nullptr;
     }
 
+    void setRoot()
+    {
+        _parent = nullptr;
+    }
+
     vector<TreeElem*>& getChildren()
+    {
+        return _children;
+    }
+    const vector<TreeElem*>& getChildren() const
     {
         return _children;
     }
@@ -788,6 +797,18 @@ public:
         return bestChild;
     }
 
+    TreeElem* findMove(const Position& move)
+    {
+        for (TreeElem* child : _children)
+        {
+            if (child->_move == move)
+            {
+                return child;
+            }
+        }
+        return nullptr;
+    }
+
 private:
     Grid _grid;
     TreeElem* _parent;
@@ -805,15 +826,52 @@ private:
 class AI
 {
 public:
-    AI(Grid& grid): _grid(grid)
-    {}
-
-    Position play(const vector<Position>& possibleActions)
+    AI(Grid& grid): _grid(grid), _treeRoot(nullptr), _timeout(1000)
     {
-        TreeElem root(_grid, nullptr, NONE);
-        Position pos = mcts(root);
+    }
+
+    Position play()
+    {
+        if (_treeRoot == nullptr)
+        {
+            _treeRoot = new TreeElem(_grid, nullptr, NONE);
+        }
+        Position pos = mcts(*_treeRoot);
+        // After first turn, timeout is 100 ms
+        _timeout = 100;
         return pos;
         //return possibleActions[0];
+    }
+
+    // Keep the part of the tree corresponding to the given moves
+    // If not existing, start from fresh tree
+    void selectTree(const vector<Position>& lastActions)
+    {
+        // Who cares about memory leaks?
+        if (lastActions.size() != 2)
+        {
+            _treeRoot = nullptr;
+            return;
+        }
+        TreeElem* myPlay = _treeRoot->findMove(lastActions[0]);
+        if (myPlay != nullptr)
+        {
+            _treeRoot = myPlay->findMove(lastActions[1]);
+            if (_treeRoot != nullptr)
+            {
+                _treeRoot->setRoot();
+            }
+        }
+        else
+        {
+            _treeRoot = nullptr;
+        }
+    }
+
+    // For testing purpose
+    const TreeElem& getTreeRoot() const
+    {
+        return *_treeRoot;
     }
 
 private:
@@ -825,7 +883,7 @@ private:
         int loops = 0;
         chrono::time_point<chrono::high_resolution_clock> start = chrono::high_resolution_clock::now();
 #ifndef LOCAL
-        while (chrono::duration_cast<std::chrono::milliseconds>(chrono::high_resolution_clock::now() - start).count() < 100)
+        while (chrono::duration_cast<std::chrono::milliseconds>(chrono::high_resolution_clock::now() - start).count() < _timeout)
 #else
         for (int i = 0; i < 7000; i++)
 #endif
@@ -938,6 +996,8 @@ private:
     }
 
     Grid& _grid;
+    TreeElem* _treeRoot;
+    int _timeout;
 };
 
 
@@ -953,6 +1013,7 @@ int main()
 
     Grid grid;
     AI ai(grid);
+    vector<Position> lastActions;
 
     // game loop
     while (1) {
@@ -967,6 +1028,10 @@ int main()
         else
         {
             grid.set(opponent_col, opponent_row, ENEMY);
+            if (lastActions.size() == 2)
+            {
+                lastActions[1] = Position(opponent_col, opponent_row);
+            }
         }
         int valid_action_count;
         vector<Position> possibleActions;
@@ -979,8 +1044,13 @@ int main()
         }
 
         DBG(grid.toString());
-        Position pos = ai.play(possibleActions);
+
+        ai.selectTree(lastActions);
+        Position pos = ai.play();
         grid.set(pos.x, pos.y, ME);
+
+        lastActions.resize(2);
+        lastActions[0] = pos;
 
         // Write an action using cout. DON'T FORGET THE "<< endl"
         // To debug: cerr << "Debug messages..." << endl;

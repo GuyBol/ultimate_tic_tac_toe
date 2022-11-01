@@ -236,7 +236,35 @@ bool testMctsFinalize()
     // Force to set last play
     grid.set(8, 0, ENEMY);
     AI ai(grid);
-    assert(ai.play(vector<Position>()) == Position(8,8));
+    assert(ai.play() == Position(8,8));
+}
+
+
+bool testReuseTree()
+{
+    Grid grid = BuildGrid(  "XXX|XXX|OOO"
+                            "...|...|..."
+                            "...|...|..."
+                            "---+---+---"
+                            "OOO|OOO|XXX"
+                            "...|...|..."
+                            "...|...|..."
+                            "---+---+---"
+                            "XXX|OOO|..."
+                            "...|...|..."
+                            "...|...|...",
+                            ME);
+    // Force to set last play
+    grid.set(8, 0, ENEMY);
+    AI ai(grid);
+    Position playedByMe = ai.play();
+    assert(ai.getTreeRoot().getChildren().size() == 9);
+    vector<Position> lastMoves = {Position(6,6), Position(6,7)};
+    ai.selectTree(lastMoves);
+    assert(ai.getTreeRoot().grid().get(6,6) == ME);
+    assert(ai.getTreeRoot().grid().get(6,7) == ENEMY);
+    assert(ai.getTreeRoot().plays() > 0);
+    return true;
 }
 
 
@@ -246,7 +274,7 @@ bool testMctsPerf()
     AI ai(grid);
     grid.set(7,8,ENEMY);
     DBG(grid.toString());
-    DBG(ai.play(vector<Position>()).toString());
+    DBG(ai.play().toString());
 }
 
 
@@ -267,6 +295,7 @@ int main()
     testPositionMaskCounters();
     testGetAllowedMoves();
     testMctsFinalize();
+    testReuseTree();
 
     testMctsPerf();
 
