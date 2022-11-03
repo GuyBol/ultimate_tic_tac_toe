@@ -1,4 +1,5 @@
 #define LOCAL
+//#define DISABLE_OPTIMS
 
 #include "deployed.cpp"
 
@@ -237,6 +238,37 @@ bool testMctsFinalize()
     grid.set(8, 0, ENEMY);
     AI ai(grid);
     assert(ai.play() == Position(8,8));
+
+    return true;
+}
+
+
+bool testWhyDoILose()
+{
+    Grid grid = BuildGrid(  "...|...|..."
+                            "...|...|..."
+                            "...|...|..."
+                            "---+---+---"
+                            "...|O..|..."
+                            "...|.X.|..."
+                            "...|...|..."
+                            "---+---+---"
+                            "...|...|..."
+                            "...|...|..."
+                            "...|...|...",
+                            ME);
+    grid.set(3, 3, ENEMY);
+    AI ai(grid);
+    DBG("TITI");
+    Position pos = ai.play();
+    DBG("TOTO " << pos.toString());
+    const TreeElem& root = ai.getTreeRoot();
+    for (const TreeElem* child : root.getChildren())
+    {
+        DBG(child->move().toString() << " " << child->score() << " " << child->plays() << " " << child->uct());
+    }
+
+    return true;
 }
 
 
@@ -296,6 +328,8 @@ int main()
     testGetAllowedMoves();
     testMctsFinalize();
     testReuseTree();
+
+    testWhyDoILose();
 
     testMctsPerf();
 

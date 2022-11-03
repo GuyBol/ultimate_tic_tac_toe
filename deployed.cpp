@@ -1,9 +1,13 @@
+#ifndef DISABLE_OPTIMS
+
 #undef _GLIBCXX_DEBUG                // disable run-time bound checking, etc
 #pragma GCC optimize("Ofast,inline")
 #pragma GCC target("bmi,bmi2,lzcnt,popcnt")
 #pragma GCC target("movbe")
 #pragma GCC target("aes,pclmul,rdrnd")
 #pragma GCC target("avx,avx2,f16c,fma,sse3,ssse3,sse4.1,sse4.2")
+
+#endif
 
 
 #include <iostream>
@@ -133,18 +137,29 @@ public:
     // Get the (x,y) coordinate within subgrid from a subgrid mask
     static Position GetPositionFromSubMask(uint64_t mask)
     {
-        static map<uint64_t, Position> mapping = {
-            {0b1,           Position(0,0)},
-            {0b10,          Position(1,0)},
-            {0b100,         Position(2,0)},
-            {0b1000,        Position(0,1)},
-            {0b10000,       Position(1,1)},
-            {0b100000,      Position(2,1)},
-            {0b1000000,     Position(0,2)},
-            {0b10000000,    Position(1,2)},
-            {0b100000000,   Position(2,2)}
-            };
-        return mapping[mask];
+        switch (mask)
+        {
+        case 0b1:
+            return Position(0,0);
+        case 0b10:
+            return Position(1,0);
+        case 0b100:
+            return Position(2,0);
+        case 0b1000:
+            return Position(0,1);
+        case 0b10000:
+            return Position(1,1);
+        case 0b100000:
+            return Position(2,1);
+        case 0b1000000:
+            return Position(0,2);
+        case 0b10000000:
+            return Position(1,2);
+        case 0b100000000:
+            return Position(2,2);
+        default:
+            return Position(-1,-1);
+        }
     }
 
     // Get the nth set bit in a uint64_t starting from the left (most significant bit)
@@ -225,13 +240,19 @@ private:
 class SubGrid
 {
 public:
+    static const uint64_t _EmptyMask;
+    static const uint64_t _MyMask;
+    static const uint64_t _EnemyMask;
+    static const uint64_t _CompletedMask;
+    static const uint64_t _Pos0Mask;
+
     SubGrid(): _winner(UNDEFINED)
     {
         _spaces = _EmptyMask;
     }
 
     // Implement copy ctor and assign operator to reset cache
-    SubGrid(const SubGrid& other): _spaces(other._spaces), _winner(UNDEFINED)
+    /*SubGrid(const SubGrid& other): _spaces(other._spaces), _winner(UNDEFINED)
     {
     }
 
@@ -240,7 +261,7 @@ public:
         _spaces = other._spaces;
         _winner = UNDEFINED;
         return *this;
-    }
+    }*/
 
     Player get(int x, int y) const
     {
@@ -312,7 +333,7 @@ public:
     {
         if (_winner != UNDEFINED)
             return _winner;
-        static array<uint64_t, 8> lines = 
+        static array<uint64_t, 8> linesMe = 
         {
             0b111 << 9,
             0b111000 << 9,
@@ -323,14 +344,28 @@ public:
             0b100010001 << 9,
             0b1010100 << 9,
         };
-        for (uint64_t mask : lines)
+        static array<uint64_t, 8> linesEnemy = 
+        {
+            0b111 << 18,
+            0b111000 << 18,
+            0b111000000 << 18,
+            0b1001001 << 18,
+            0b10010010 << 18,
+            0b100100100 << 18,
+            0b100010001 << 18,
+            0b1010100 << 18,
+        };
+        for (uint64_t mask : linesMe)
         {
             if ((_spaces & mask) == mask)
             {
                 _winner = ME;
                 return ME;
             }
-            else if ((_spaces & (mask << 9)) == (mask << 9))
+        }
+        for (uint64_t mask : linesEnemy)
+        {
+            if ((_spaces & mask) == mask)
             {
                 _winner = ENEMY;
                 return ENEMY;
@@ -395,16 +430,12 @@ public:
 private:
     uint64_t _spaces;
     mutable Player _winner;
-
-    static const uint64_t _EmptyMask;
-    static const uint64_t _MyMask;
-    static const uint64_t _EnemyMask;
-    static const uint64_t _Pos0Mask;
 };
 
 const uint64_t SubGrid::_EmptyMask = 0b111111111;
 const uint64_t SubGrid::_MyMask = 0b111111111 << 9;
 const uint64_t SubGrid::_EnemyMask = 0b111111111 << 18;
+const uint64_t SubGrid::_CompletedMask = ((uint64_t)0b111111111) << 27;
 const uint64_t SubGrid::_Pos0Mask = 1 | (1 << 9) | (1 << 18);
 
 
@@ -414,7 +445,7 @@ typedef array<Position, 81> movesBuffer_t;
 class Grid
 {
 public:
-    Grid(): _lastPlay(-1, -1)
+    Grid(): _lastPlay(-1, -1), _subGridsCache(SubGrid::_EmptyMask)
     {}
 
     Player get(int x, int y) const
@@ -427,8 +458,10 @@ public:
         getSubGridByPos(x, y).set(x % 3, y % 3, owner);
         _lastPlay.x = x;
         _lastPlay.y = y;
+        updateCache(getSubGridIdByPos(x, y));
     }
 
+    // Set only the first position of the mask
     void set(const PositionMask& posMask, Player owner)
     {
         for (int i = 0; i < 9; i++)
@@ -437,6 +470,8 @@ public:
             {
                 _lastPlay = PositionMask::GetPositionFromSubMask(posMask.get(i));
                 _subGrids[i].set(posMask.get(i), owner);
+                updateCache(i);
+                return;
             }
         }
     }
@@ -497,60 +532,58 @@ public:
     Player getWinner() const
     {
         // Check if the meta tic-tac-toe is won
-        if (getSubGrid(0,0).getWinner() != NONE && getSubGrid(0,0).getWinner() == getSubGrid(1,0).getWinner() && getSubGrid(0,0).getWinner() == getSubGrid(2,0).getWinner())
-            return getSubGrid(0,0).getWinner();
-        else if (getSubGrid(0,1).getWinner() != NONE && getSubGrid(0,1).getWinner() == getSubGrid(1,1).getWinner() && getSubGrid(0,1).getWinner() == getSubGrid(2,1).getWinner())
-            return getSubGrid(0,1).getWinner();
-        else if (getSubGrid(0,2).getWinner() != NONE && getSubGrid(0,2).getWinner() == getSubGrid(1,2).getWinner() && getSubGrid(0,2).getWinner() == getSubGrid(2,2).getWinner())
-            return getSubGrid(0,2).getWinner();
-        else if (getSubGrid(0,0).getWinner() != NONE && getSubGrid(0,0).getWinner() == getSubGrid(0,1).getWinner() && getSubGrid(0,0).getWinner() == getSubGrid(0,2).getWinner())
-            return getSubGrid(0,0).getWinner();
-        else if (getSubGrid(1,0).getWinner() != NONE && getSubGrid(1,0).getWinner() == getSubGrid(1,1).getWinner() && getSubGrid(1,0).getWinner() == getSubGrid(1,2).getWinner())
-            return getSubGrid(1,0).getWinner();
-        else if (getSubGrid(2,0).getWinner() != NONE && getSubGrid(2,0).getWinner() == getSubGrid(2,1).getWinner() && getSubGrid(2,0).getWinner() == getSubGrid(2,2).getWinner())
-            return getSubGrid(2,0).getWinner();
-        else if (getSubGrid(0,0).getWinner() != NONE && getSubGrid(0,0).getWinner() == getSubGrid(1,1).getWinner() && getSubGrid(0,0).getWinner() == getSubGrid(2,2).getWinner())
-            return getSubGrid(0,0).getWinner();
-        else if (getSubGrid(2,0).getWinner() != NONE && getSubGrid(2,0).getWinner() == getSubGrid(1,1).getWinner() && getSubGrid(2,0).getWinner() == getSubGrid(0,2).getWinner())
-            return getSubGrid(2,0).getWinner();
-        // If not, won may be awarded if all the subgrid are completed; count the number of subgrids won
-        int myCounter = 0;
-        int enemyCounter = 0;
-        for (const SubGrid& subGrid : _subGrids)
+        static array<uint64_t, 8> linesMe = 
         {
-            if (subGrid.completed())
+            0b111 << 9,
+            0b111000 << 9,
+            0b111000000 << 9,
+            0b1001001 << 9,
+            0b10010010 << 9,
+            0b100100100 << 9,
+            0b100010001 << 9,
+            0b1010100 << 9,
+        };
+        static array<uint64_t, 8> linesEnemy = 
+        {
+            0b111 << 18,
+            0b111000 << 18,
+            0b111000000 << 18,
+            0b1001001 << 18,
+            0b10010010 << 18,
+            0b100100100 << 18,
+            0b100010001 << 18,
+            0b1010100 << 18,
+        };
+        for (uint64_t mask : linesMe)
+        {
+            if ((_subGridsCache & mask) == mask)
             {
-                switch (subGrid.getWinner())
-                {
-                case ME:
-                    myCounter++;
-                    break;
-                case ENEMY:
-                    enemyCounter++;
-                    break;
-                default:
-                    break;
-                }
+                return ME;
             }
+        }
+        for (uint64_t mask : linesMe)
+        {
+            if ((_subGridsCache & mask) == mask)
+            {
+                return ENEMY;
+            }
+        }
+        // If not, won may be awarded if all the subgrid are completed
+        if ((_subGridsCache & SubGrid::_CompletedMask) == SubGrid::_CompletedMask)
+        {
+            // Count the number of subgrids won
+            int myCount = __builtin_popcountl(_subGridsCache & SubGrid::_MyMask);
+            int enemyCount = __builtin_popcountl(_subGridsCache & SubGrid::_EnemyMask);
+            if (myCount > enemyCount)
+                return ME;
+            else if (enemyCount > myCount)
+                return ENEMY;
             else
-            {
-                // If there is at least 1 subgrid uncompleted, there is no winner yet
-                return UNDEFINED;
-            }
-        }
-        if (myCounter > enemyCounter)
-        {
-            //DBG("Winner by count " << myCounter << " vs " << enemyCounter);
-            return ME;
-        }
-        else if (myCounter < enemyCounter)
-        {
-            //DBG("Winner by count " << myCounter << " vs " << enemyCounter);
-            return ENEMY;
+                return NONE;
         }
         else
         {
-            return NONE;
+            return UNDEFINED;
         }
     }
 
@@ -630,8 +663,42 @@ private:
         return getSubGrid(x/3, y/3);
     }
 
+    void updateCache(int gridId)
+    {
+        uint64_t maskSet = SubGrid::_Pos0Mask << gridId;
+        uint64_t maskReset = ~maskSet;
+        switch (_subGrids[gridId].getWinner())
+        {
+        case NONE:
+            maskSet &= SubGrid::_EmptyMask;
+            break;
+        case ME:
+            maskSet &= SubGrid::_MyMask;
+            break;
+        case ENEMY:
+            maskSet &= SubGrid::_EnemyMask;
+            break;
+        default:
+            break;
+        }
+        _subGridsCache &= maskReset;
+        _subGridsCache |= maskSet;
+        if (_subGrids[gridId].completed())
+        {
+            _subGridsCache |= (1UL << (gridId + 27));
+        }
+        else
+        {
+            _subGridsCache &= ~(1UL << (gridId + 27));
+        }
+    }
+
     array<SubGrid, 9> _subGrids;
     Position _lastPlay;
+    // Contains the winner of each sub grid
+    // Groups of 9 bits, from left to right:
+    // Completed - Enemy - Me - None
+    uint64_t _subGridsCache;
 };
 
 
@@ -885,7 +952,7 @@ private:
 #ifndef LOCAL
         while (chrono::duration_cast<std::chrono::milliseconds>(chrono::high_resolution_clock::now() - start).count() < _timeout)
 #else
-        for (int i = 0; i < 7000; i++)
+        for (int i = 0; i < 10000; i++)
 #endif
         {
             TreeElem* selected = selection(root);
