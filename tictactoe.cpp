@@ -265,7 +265,7 @@ bool testWhyDoILose()
     const TreeElem& root = ai.getTreeRoot();
     for (const TreeElem* child : root.getChildren())
     {
-        DBG(child->move().toString() << " " << child->score() << " " << child->plays() << " " << child->uct());
+        DBG(child->move().toString() << " " << child->score() << " " << child->plays() << " " << child->computeUct());
     }
 
     return true;

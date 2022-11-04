@@ -661,9 +661,7 @@ public:
         _player(player),
         _move(move),
         _score(0),
-        _plays(0),
-        _uct(0.),
-        _allowedMovesCached(false)
+        _plays(0)
     {
     }
 
@@ -691,6 +689,11 @@ public:
         return _children;
     }
 
+    bool isLeaf() const
+    {
+        return _children.empty();
+    }
+
     const Grid& grid() const
     {
         return _grid;
@@ -706,45 +709,9 @@ public:
         return _move;
     }
 
-    bool allowedMovesRemain() const
+    int getAllowedMoves(movesBuffer_t& buffer) const
     {
-        return !getAllowedMoves().empty();
-    }
-
-    const list<Position>& getAllowedMoves() const
-    {
-        if (_allowedMovesCached)
-        {
-            return _allowedMoves;
-        }
-        else
-        {
-            movesBuffer_t buffer;
-            int size = _grid.getAllowedMoves(buffer);
-            for (int i = 0; i < size; i++)
-            {
-                _allowedMoves.push_back(buffer[i]);
-            }
-            _allowedMovesCached = true;
-            return _allowedMoves;
-        }
-    }
-
-    // Pop a random allowed move
-    Position popAllowedMove()
-    {
-        getAllowedMoves();
-        int pick = Random::Rand(_allowedMoves.size());
-        int i = 0;
-        list<Position>::iterator iter = _allowedMoves.begin();
-        for (; iter != _allowedMoves.end(); iter++)
-        {
-            if (i++ == pick)
-                break;
-        }
-        Position move = *iter;
-        _allowedMoves.erase(iter);
-        return move;
+        return _grid.getAllowedMoves(buffer);
     }
 
     TreeElem* addChild(Position moveToPlay, Player player)
@@ -772,16 +739,14 @@ public:
         return _plays;
     }
 
-    void updateUct()
+    double computeUct() const
     {
         // TODO should we consider the defeat as negative score?
         //DBG(_score << " " << _plays << " " << _parent->_plays);
-        _uct = ((double)_score/(double)_plays) + 1.414 * sqrt(log((double)_parent->_plays)/(double)_plays);
-    }
-
-    double uct() const
-    {
-        return _uct;
+        if (_plays == 0)
+            return INFINITY;
+        else
+            return ((double)_score/(double)_plays) + 1.414 * sqrt(log((double)_parent->_plays)/(double)_plays);
     }
 
     TreeElem* getChildWithBestUct() const
@@ -790,9 +755,10 @@ public:
         TreeElem* bestChild = nullptr;
         for (TreeElem* child : _children)
         {
-            if (child->_uct > bestUct)
+            double uct = child->computeUct();
+            if (uct > bestUct)
             {
-                bestUct = child->_uct;
+                bestUct = uct;
                 bestChild = child;
             }
         }
@@ -834,9 +800,6 @@ private:
     Position _move; // The move that lead to this node
     int _score;
     int _plays;
-    double _uct;
-    mutable list<Position> _allowedMoves;
-    mutable bool _allowedMovesCached;
 };
 
 
@@ -894,6 +857,7 @@ public:
 private:
     // Monte Carlo Tree Search
     // https://vgarciasc.github.io/mcts-viz/
+    // https://www.youtube.com/watch?v=UXW2yZndl7U
     Position mcts(TreeElem& root)
     {
         DBG("mcts");
@@ -921,33 +885,38 @@ private:
 
     TreeElem* selection(TreeElem& treeElem)
     {
-        // If we have still children to add to this node
-        if (treeElem.allowedMovesRemain())
+        if (treeElem.isLeaf())
         {
             return &treeElem;
-        }
-        else if (!treeElem.getChildren().empty())
-        {
-            // Apply the selection on the best child
-            return selection(*treeElem.getChildWithBestUct());
         }
         else
         {
-            // Leaf
-            return &treeElem;
+            return selection(*treeElem.getChildWithBestUct());
         }
     }
 
     TreeElem* expansion(TreeElem& treeElem)
     {
-        if (treeElem.allowedMovesRemain())
+        if (treeElem.plays() > 0 || treeElem.isRoot())
         {
-            Position move = treeElem.popAllowedMove();
-            return treeElem.addChild(move, nextPlayer(treeElem.player()));
+            // Add all possible children
+            movesBuffer_t allowedMoves;
+            int movesCount = treeElem.getAllowedMoves(allowedMoves);
+            if (movesCount > 0)
+            {
+                for (int i = 0; i < movesCount; i++)
+                {
+                    treeElem.addChild(allowedMoves[i], nextPlayer(treeElem.player()));
+                }
+                return treeElem.getChildren()[0];
+            }
+            else
+            {
+                return &treeElem;
+            }
         }
         else
         {
-            // Leaf
             return &treeElem;
         }
     }
@@ -989,10 +958,6 @@ private:
         {
             currentElem = currentElem->parent();
             currentElem->addScore(score);
-            for (TreeElem* child : currentElem->getChildren())
-            {
-                child->updateUct();
-            }
         }
     }
 
