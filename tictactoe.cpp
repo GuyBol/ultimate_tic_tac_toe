@@ -322,14 +322,14 @@ int main()
     G_myDisplay = "X";
     G_enemyDisplay = "O";
 
-    testGetWinner();
-    testPositionMask();
-    testPositionMaskCounters();
-    testGetAllowedMoves();
-    testMctsFinalize();
-    testReuseTree();
+    // testGetWinner();
+    // testPositionMask();
+    // testPositionMaskCounters();
+    // testGetAllowedMoves();
+    // testMctsFinalize();
+    // testReuseTree();
 
-    testWhyDoILose();
+    // testWhyDoILose();
 
     testMctsPerf();
 

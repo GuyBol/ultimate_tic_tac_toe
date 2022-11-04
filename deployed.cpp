@@ -86,17 +86,23 @@ struct Position
 class PositionMask
 {
 public:
-    PositionMask(): _masks({0UL, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL})
+    PositionMask(): _masks({0UL, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL}), _subgrid(0)
     {}
 
     void set(int subGridId, uint64_t localMask)
     {
         _masks[subGridId] = localMask;
+        _subgrid = subGridId;
     }
 
     uint64_t get(int subGridId) const
     {
         return _masks[subGridId];
+    }
+
+    int lastSetSubgrid() const
+    {
+        return _subgrid;
     }
 
     // Count the total number of bit set in this mask
@@ -118,16 +124,19 @@ public:
         int subGridId = 0;
         for (uint64_t mask : _masks)
         {
-            int bitsSetCount = __builtin_popcountl(mask);
-            if (index < bitsSetCount)
+            if (mask != 0)
             {
-                unsigned int position = GetNthSetBit(mask, index);
-                result.set(subGridId, 1UL << position);
-                return result;
-            }
-            else
-            {
-                index -= bitsSetCount;
+                int bitsSetCount = __builtin_popcountl(mask);
+                if (index < bitsSetCount)
+                {
+                    unsigned int position = GetNthSetBit(mask, index);
+                    result.set(subGridId, 1UL << position);
+                    return result;
+                }
+                else
+                {
+                    index -= bitsSetCount;
+                }
             }
             subGridId++;
         }
@@ -234,6 +243,7 @@ public:
 
 private:
     array<uint64_t, 9> _masks;
+    int _subgrid; // The last subgrid in which a player was set
 };
 
 
@@ -327,7 +337,7 @@ public:
     {
         if (_winner != UNDEFINED)
             return _winner;
-        static array<uint64_t, 8> lines = 
+        static array<uint64_t, 8> linesMe = 
         {
             0b111 << 9,
             0b111000 << 9,
@@ -338,14 +348,29 @@ public:
             0b100010001 << 9,
             0b1010100 << 9,
         };
-        for (uint64_t mask : lines)
+        static array<uint64_t, 8> linesEnemy = 
+        {
+            0b111 << 18,
+            0b111000 << 18,
+            0b111000000 << 18,
+            0b1001001 << 18,
+            0b10010010 << 18,
+            0b100100100 << 18,
+            0b100010001 << 18,
+            0b1010100 << 18,
+        };
+        // TODO hardcode the loops with if
+        for (uint64_t mask : linesMe)
         {
             if ((_spaces & mask) == mask)
             {
                 _winner = ME;
                 return ME;
             }
-            else if ((_spaces & (mask << 9)) == (mask << 9))
+        }
+        for (uint64_t mask : linesEnemy)
+        {
+            if ((_spaces & mask) == mask)
             {
                 _winner = ENEMY;
                 return ENEMY;
@@ -447,15 +472,8 @@ public:
     // Set only the first position of the mask
     void set(const PositionMask& posMask, Player owner)
     {
-        for (int i = 0; i < 9; i++)
-        {
-            if (posMask.get(i) != 0)
-            {
-                _lastPlay = PositionMask::GetPositionFromSubMask(posMask.get(i));
-                _subGrids[i].set(posMask.get(i), owner);
-                return;
-            }
-        }
+        _lastPlay = PositionMask::GetPositionFromSubMask(posMask.get(posMask.lastSetSubgrid()));
+        _subGrids[posMask.lastSetSubgrid()].set(posMask.get(posMask.lastSetSubgrid()), owner);
     }
 
     int getAllowedMoves(movesBuffer_t& allowed) const
@@ -514,7 +532,7 @@ public:
     Player getWinner() const
     {
         // Check if the meta tic-tac-toe is won
-        if (getSubGrid(0,0).getWinner() != NONE && getSubGrid(0,0).getWinner() == getSubGrid(1,0).getWinner() && getSubGrid(0,0).getWinner() == getSubGrid(2,0).getWinner())
+        /*if (getSubGrid(0,0).getWinner() != NONE && getSubGrid(0,0).getWinner() == getSubGrid(1,0).getWinner() && getSubGrid(0,0).getWinner() == getSubGrid(2,0).getWinner())
             return getSubGrid(0,0).getWinner();
         else if (getSubGrid(0,1).getWinner() != NONE && getSubGrid(0,1).getWinner() == getSubGrid(1,1).getWinner() && getSubGrid(0,1).getWinner() == getSubGrid(2,1).getWinner())
             return getSubGrid(0,1).getWinner();
@@ -529,7 +547,33 @@ public:
         else if (getSubGrid(0,0).getWinner() != NONE && getSubGrid(0,0).getWinner() == getSubGrid(1,1).getWinner() && getSubGrid(0,0).getWinner() == getSubGrid(2,2).getWinner())
             return getSubGrid(0,0).getWinner();
         else if (getSubGrid(2,0).getWinner() != NONE && getSubGrid(2,0).getWinner() == getSubGrid(1,1).getWinner() && getSubGrid(2,0).getWinner() == getSubGrid(0,2).getWinner())
-            return getSubGrid(2,0).getWinner();
+            return getSubGrid(2,0).getWinner();*/
+        if (getSubGrid(1,1).getWinner() != NONE)
+        {
+            if ((getSubGrid(1,1).getWinner() == getSubGrid(0,0).getWinner() && getSubGrid(1,1).getWinner() == getSubGrid(2,2).getWinner())
+             || (getSubGrid(1,1).getWinner() == getSubGrid(1,0).getWinner() && getSubGrid(1,1).getWinner() == getSubGrid(1,2).getWinner())
+             || (getSubGrid(1,1).getWinner() == getSubGrid(2,0).getWinner() && getSubGrid(1,1).getWinner() == getSubGrid(0,2).getWinner())
+             || (getSubGrid(1,1).getWinner() == getSubGrid(0,1).getWinner() && getSubGrid(1,1).getWinner() == getSubGrid(2,1).getWinner()))
+            {
+                return getSubGrid(1,1).getWinner();
+            }
+        }
+        if (getSubGrid(0,0).getWinner() != NONE)
+        {
+            if ((getSubGrid(0,0).getWinner() == getSubGrid(1,0).getWinner() && getSubGrid(0,0).getWinner() == getSubGrid(2,0).getWinner())
+             || (getSubGrid(0,0).getWinner() == getSubGrid(0,1).getWinner() && getSubGrid(0,0).getWinner() == getSubGrid(0,2).getWinner()))
+            {
+                return getSubGrid(0,0).getWinner();
+            }
+        }
+        if (getSubGrid(2,2).getWinner() != NONE)
+        {
+            if ((getSubGrid(2,2).getWinner() == getSubGrid(2,0).getWinner() && getSubGrid(2,2).getWinner() == getSubGrid(2,1).getWinner())
+             || (getSubGrid(2,2).getWinner() == getSubGrid(0,2).getWinner() && getSubGrid(2,2).getWinner() == getSubGrid(1,2).getWinner()))
+            {
+                return getSubGrid(2,2).getWinner();
+            }
+        }
         // If not, won may be awarded if all the subgrid are completed; count the number of subgrids won
         int myCounter = 0;
         int enemyCounter = 0;
@@ -746,7 +790,7 @@ public:
         if (_plays == 0)
             return INFINITY;
         else
-            return ((double)_score/(double)_plays) + 1.414 * sqrt(log((double)_parent->_plays)/(double)_plays);
+            return ((double)_score/(double)_plays) + /*1.414*/2 * sqrt(log((double)_parent->_plays)/(double)_plays);
     }
 
     TreeElem* getChildWithBestUct() const
