@@ -46,6 +46,17 @@ public:
 };
 
 
+double MyLog(unsigned int value)
+{
+    static array<double, 1000000> cache = {0.};
+    if (cache[value] == 0.)
+    {
+        cache[value] = log(value);
+    }
+    return cache[value];
+}
+
+
 string G_myDisplay = "O";
 string G_enemyDisplay = "X";
 
@@ -362,7 +373,6 @@ public:
             0b100010001 << 18,
             0b1010100 << 18,
         };
-        // TODO hardcode the loops with if
         for (uint64_t mask : linesMe)
         {
             if ((_spaces & mask) == mask)
@@ -793,7 +803,7 @@ public:
         if (_plays == 0)
             return INFINITY;
         else
-            return ((double)_score/(double)_plays) + 1.414 * sqrt(log((double)_parent->_plays)/(double)_plays);
+            return ((double)_score/(double)_plays) + /*(1.414*/2. * sqrt(MyLog(_parent->_plays)/(double)_plays);
     }
 
     TreeElem* getChildWithBestUct() const
@@ -993,11 +1003,11 @@ private:
         switch (winner)
         {
         case ME:
-            return 1;
+            return 2;
         case ENEMY:
             return 0;//-1;
         default:
-            return 0;
+            return 1;
         }
     }
 

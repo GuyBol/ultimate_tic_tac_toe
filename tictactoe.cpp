@@ -37,6 +37,18 @@ Grid BuildGrid(const string& str, Player first)
 
 // Tests here
 
+bool testMyLog()
+{
+    assert(MyLog(1) == log(1));
+    assert(MyLog(1) == log(1));
+    assert(MyLog(2) == log(2));
+    assert(MyLog(123456) == log(123456));
+    assert(MyLog(2) == log(2));
+    assert(MyLog(123456) == log(123456));
+    return true;
+}
+
+
 bool testGetWinner()
 {
     Grid grid = BuildGrid("X.O|...|OXX"
@@ -324,6 +336,7 @@ int main()
     G_myDisplay = "X";
     G_enemyDisplay = "O";
 
+    testMyLog();
     testGetWinner();
     testPositionMask();
     testPositionMaskCounters();
