@@ -1,4 +1,5 @@
 #define LOCAL
+#define MCTS_LOOPS_LIMIT 10000
 //#define DISABLE_OPTIMS
 
 #include "deployed.cpp"
@@ -259,13 +260,14 @@ bool testWhyDoILose()
                             ME);
     grid.set(3, 3, ENEMY);
     AI ai(grid);
-    DBG("TITI");
+    DBG(grid.toString());
     Position pos = ai.play();
-    DBG("TOTO " << pos.toString());
+    DBG("Play: " << pos.toString());
     const TreeElem& root = ai.getTreeRoot();
     for (const TreeElem* child : root.getChildren())
     {
-        DBG(child->move().toString() << " " << child->score() << " " << child->plays() << " " << child->computeUct());
+        DBG(child->move().toString() << " " << child->score() << "/" << child->plays()
+            << " (" << (double)child->score()/(double)child->plays() << ") uct: " << child->computeUct());
     }
 
     return true;
@@ -322,14 +324,14 @@ int main()
     G_myDisplay = "X";
     G_enemyDisplay = "O";
 
-    // testGetWinner();
-    // testPositionMask();
-    // testPositionMaskCounters();
-    // testGetAllowedMoves();
-    // testMctsFinalize();
-    // testReuseTree();
+    testGetWinner();
+    testPositionMask();
+    testPositionMaskCounters();
+    testGetAllowedMoves();
+    testMctsFinalize();
+    testReuseTree();
 
-    // testWhyDoILose();
+    testWhyDoILose();
 
     testMctsPerf();
 
