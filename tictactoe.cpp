@@ -97,9 +97,11 @@ bool testGetWinner()
     assert(grid.get(7,4) == ME);
     assert(grid.get(0,8) == ENEMY);
     assert(grid.getWinner() == UNDEFINED);
+    assert(grid.countEmptySpaces() == 27);
     grid.set(4,4,ME);
     assert(grid.get(4,4) == ME);
     assert(grid.getWinner() == ME);
+    assert(grid.countEmptySpaces() == 26);
     return true;
 }
 
@@ -368,16 +370,16 @@ int main()
     G_myDisplay = "X";
     G_enemyDisplay = "O";
 
-    testMyLog();
-    testSubGrid();
-    testGetWinner();
-    testPositionMask();
-    testPositionMaskCounters();
-    testGetAllowedMoves();
-    testMctsFinalize();
-    testReuseTree();
+    // testMyLog();
+    // testSubGrid();
+    // testGetWinner();
+    // testPositionMask();
+    // testPositionMaskCounters();
+    // testGetAllowedMoves();
+    // testMctsFinalize();
+    // testReuseTree();
 
-    testWhyDoILose();
+    // testWhyDoILose();
 
     testMctsPerf();
 

@@ -203,6 +203,13 @@ public:
         }
     }
 
+    // Count the number of set bits in a mask
+    // mask on 9 bits max
+    static unsigned int CountSetBits(uint64_t mask)
+    {
+        return _Cache[mask][9];
+    }
+
     // Get a  mask with the nth set bit in a uint64_t starting from the left (most significant bit)
     // Return the position of this bit from the right
     // Warning: counts only amongst the last 9 bits
@@ -403,6 +410,11 @@ public:
     uint64_t getEmptySpacesMask() const
     {
         return _emptySpaces;
+    }
+
+    int countEmptySpaces() const
+    {
+        return PositionMask::CountSetBits(_emptySpaces);
     }
 
     bool hasEmptySpaces() const
@@ -647,6 +659,16 @@ public:
         }
     }
 
+    int countEmptySpaces() const
+    {
+        int count = 0;
+        for (const SubGrid& subGrid : _subGrids)
+        {
+            count += subGrid.countEmptySpaces();
+        }
+        return count;
+    }
+
     bool operator==(const Grid& other) const
     {
         for (int i = 0; i < 9; i++)
@@ -822,7 +844,7 @@ public:
         if (_plays == 0)
             return INFINITY;
         else
-            return ((double)_score/(double)_plays) + /*(1.414*/2. * sqrt(MyLog(_parent->_plays)/(double)_plays);
+            return ((double)_score/(double)_plays) + /*(1.414*/180. * sqrt(MyLog(_parent->_plays)/(double)_plays);
     }
 
     TreeElem* getChildWithBestUct() const
@@ -1031,11 +1053,14 @@ private:
         switch (winner)
         {
         case ME:
-            return 2;
+            return 81 - grid.countEmptySpaces();
+            //return 2;
         case ENEMY:
-            return 0;//-1;
+            return grid.countEmptySpaces() - 81;
+            //return 0;//-1;
         default:
-            return 1;
+            return 0;
+            //return 1;
         }
     }
 
