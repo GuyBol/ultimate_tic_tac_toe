@@ -868,6 +868,15 @@ public:
         return nullptr;
     }
 
+    void killBrothers()
+    {
+        if (!isRoot())
+        {
+            _parent->_children.clear();
+            _parent->_children.push_back(this);
+        }
+    }
+
 private:
     Grid _grid;
     TreeElem* _parent;
@@ -1006,6 +1015,10 @@ private:
         Grid grid = treeElem.grid();
         Player player = treeElem.player();
         Player winner = grid.getWinner();
+        if (winner == player)
+        {
+            treeElem.killBrothers();
+        }
         while (winner == UNDEFINED)
         {
             PositionMask allowedMoves;
