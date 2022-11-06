@@ -49,6 +49,36 @@ bool testMyLog()
 }
 
 
+bool testSubGrid()
+{
+    SubGrid subgrid;
+    assert(subgrid.getWinner() == NONE);
+    assert(subgrid.get(1,0) == NONE);
+    assert(subgrid.getEmptySpacesMask() == 0b111111111);
+    assert(subgrid.hasEmptySpaces());
+    subgrid.set(1,0,ME);
+    assert(subgrid.get(1,0) == ME);
+    subgrid.set(0,0,ENEMY);
+    assert(subgrid.get(0,0) == ENEMY);
+    subgrid.set(1,1,ME);
+    assert(subgrid.getWinner() == NONE);
+    subgrid.set(2,2,ENEMY);
+    assert(!subgrid.completed());
+    subgrid.set(1,2,ME);
+    assert(subgrid.getWinner() == ME);
+    assert(subgrid.completed());
+    assert(subgrid.getEmptySpacesMask() == 0b001101100);
+    assert(subgrid.hasEmptySpaces());
+    subgrid.set(0b001000000, ENEMY);
+    subgrid.set(0b000100000, ME);
+    subgrid.set(0b000001000, ENEMY);
+    subgrid.set(0b000000100, ME);
+    assert(!subgrid.hasEmptySpaces());
+
+    return true;
+}
+
+
 bool testGetWinner()
 {
     Grid grid = BuildGrid("X.O|...|OXX"
@@ -337,6 +367,7 @@ int main()
     G_enemyDisplay = "O";
 
     testMyLog();
+    testSubGrid();
     testGetWinner();
     testPositionMask();
     testPositionMaskCounters();

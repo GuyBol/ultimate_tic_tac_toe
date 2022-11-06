@@ -264,133 +264,158 @@ private:
 class SubGrid
 {
 public:
-    SubGrid(): _winner(UNDEFINED)
-    {
-        _spaces = _EmptyMask;
-    }
-
-    // Implement copy ctor and assign operator to reset cache
-    /*SubGrid(const SubGrid& other): _spaces(other._spaces), _winner(UNDEFINED)
-    {
-    }
-
-    SubGrid& operator=(const SubGrid& other)
-    {
-        _spaces = other._spaces;
-        _winner = UNDEFINED;
-        return *this;
-    }*/
+    SubGrid(): _mySpaces(0UL), _enemySpaces(0UL), _emptySpaces(0b111111111), _winner(UNDEFINED)
+    {}
 
     Player get(int x, int y) const
     {
-        uint64_t masked = _spaces & (_Pos0Mask << (x + y*3));
-        if (masked <= _EmptyMask)
-            return NONE;
-        else if (masked <= _MyMask)
+        if (_mySpaces & (1UL << (x + y*3)))
             return ME;
-        else
+        else if (_enemySpaces & (1UL << (x + y*3)))
             return ENEMY;
+        else
+            return NONE;
     }
 
-    void set(uint64_t mask, Player owner)
+    void set(uint64_t inputMask, Player owner)
     {
         _winner = UNDEFINED;
-        // First reset
-        _spaces &= ~mask & ~(mask << 9) & ~(mask << 18);
-        // Then set
-        switch (owner)
+        uint64_t mask = 0UL;
+        switch (inputMask)
         {
-        case NONE:
-            _spaces |= mask;
+        case 0b000000001:
+            mask = 0b000001000000001000000001UL;
             break;
-        case ME:
-            _spaces |= mask << 9;
+        case 0b000000010:
+            mask = 0b000000000001000000000010UL;
             break;
-        case ENEMY:
-            _spaces |= mask << 18;
+        case 0b000000100:
+            mask = 0b001000001000000000000100UL;
+            break;
+        case 0b000001000:
+            mask = 0b000000000000010000001000UL;
+            break;
+        case 0b000010000:
+            mask = 0b010010000010000000010000UL;
+            break;
+        case 0b000100000:
+            mask = 0b000000010000000000100000UL;
+            break;
+        case 0b001000000:
+            mask = 0b100000000000100001000000UL;
+            break;
+        case 0b010000000:
+            mask = 0b000000000100000010000000UL;
+            break;
+        case 0b100000000:
+            mask = 0b000100100000000100000000UL;
             break;
         default:
             break;
+        }
+        if (owner == ME)
+        {
+            _mySpaces |= mask;
+            _emptySpaces &= ~inputMask;
+        }
+        else if (owner == ENEMY)
+        {
+            _enemySpaces |= mask;
+            _emptySpaces &= ~inputMask;
+        }
+        else
+        {
+            _mySpaces &= ~mask;
+            _enemySpaces &= ~mask;
+            _emptySpaces |= inputMask;
         }
     }
 
     void set(int x, int y, Player owner)
     {
         _winner = UNDEFINED;
-        uint64_t maskSet = _Pos0Mask << (x + y*3);
-        uint64_t maskReset = ~maskSet;
-        switch (owner)
+        int posId = x + y*3;
+        uint64_t mask = 0UL;
+        switch (posId)
         {
-        case NONE:
-            maskSet &= _EmptyMask;
+        case 0:
+            mask = 0b000001000000001000000001UL;
             break;
-        case ME:
-            maskSet &= _MyMask;
+        case 1:
+            mask = 0b000000000001000000000010UL;
             break;
-        case ENEMY:
-            maskSet &= _EnemyMask;
+        case 2:
+            mask = 0b001000001000000000000100UL;
+            break;
+        case 3:
+            mask = 0b000000000000010000001000UL;
+            break;
+        case 4:
+            mask = 0b010010000010000000010000UL;
+            break;
+        case 5:
+            mask = 0b000000010000000000100000UL;
+            break;
+        case 6:
+            mask = 0b100000000000100001000000UL;
+            break;
+        case 7:
+            mask = 0b000000000100000010000000UL;
+            break;
+        case 8:
+            mask = 0b000100100000000100000000UL;
             break;
         default:
             break;
         }
-        _spaces &= maskReset;
-        _spaces |= maskSet;
+        if (owner == ME)
+        {
+            _mySpaces |= mask;
+            _emptySpaces &= ~(1UL << posId);
+        }
+        else if (owner == ENEMY)
+        {
+            _enemySpaces |= mask;
+            _emptySpaces &= ~(1UL << posId);
+        }
+        else
+        {
+            _mySpaces &= ~mask;
+            _enemySpaces &= ~mask;
+            _emptySpaces |= (1UL << posId);
+        }
     }
 
     uint64_t getEmptySpacesMask() const
     {
-        return _spaces & _EmptyMask;
+        return _emptySpaces;
     }
 
     bool hasEmptySpaces() const
     {
-        return _spaces & _EmptyMask;
+        return getEmptySpacesMask() != 0;
     }
 
     Player getWinner() const
     {
         if (_winner != UNDEFINED)
             return _winner;
-        static array<uint64_t, 8> linesMe = 
+        static uint64_t winMask = 0b001001001001001001001001UL;
+        if (_mySpaces & (_mySpaces >> 1) & (_mySpaces >> 2) & winMask)
         {
-            0b111 << 9,
-            0b111000 << 9,
-            0b111000000 << 9,
-            0b1001001 << 9,
-            0b10010010 << 9,
-            0b100100100 << 9,
-            0b100010001 << 9,
-            0b1010100 << 9,
-        };
-        static array<uint64_t, 8> linesEnemy = 
-        {
-            0b111 << 18,
-            0b111000 << 18,
-            0b111000000 << 18,
-            0b1001001 << 18,
-            0b10010010 << 18,
-            0b100100100 << 18,
-            0b100010001 << 18,
-            0b1010100 << 18,
-        };
-        for (uint64_t mask : linesMe)
-        {
-            if ((_spaces & mask) == mask)
-            {
-                _winner = ME;
-                return ME;
-            }
+            _winner = ME;
+            return ME;
         }
-        for (uint64_t mask : linesEnemy)
+        if (_enemySpaces & (_enemySpaces >> 1) & (_enemySpaces >> 2) & winMask)
         {
-            if ((_spaces & mask) == mask)
-            {
-                _winner = ENEMY;
-                return ENEMY;
-            }
+            _winner = ENEMY;
+            return ENEMY;
         }
-        _winner = NONE;
-        return NONE;
+        else
+        {
+            _winner = NONE;
+            return NONE;
+        }
     }
 
     bool completed() const
@@ -400,12 +425,12 @@ public:
 
     uint64_t hash() const
     {
-        return _spaces;
+        return _mySpaces | (_enemySpaces << 24);
     }
 
     bool operator==(const SubGrid& other) const
     {
-        return _spaces == other._spaces;
+        return _mySpaces == other._mySpaces && _enemySpaces == other._enemySpaces;
     }
 
     bool operator!=(const SubGrid& other) const
@@ -415,7 +440,7 @@ public:
 
     bool operator<(const SubGrid& other) const
     {
-        return _spaces < other._spaces;
+        return hash() < other.hash();
     }
 
     string toString() const
@@ -446,19 +471,15 @@ public:
     }
 
 private:
-    uint64_t _spaces;
+    uint64_t _mySpaces;
+    uint64_t _enemySpaces;
+    uint64_t _emptySpaces;
     mutable Player _winner;
 
     static const uint64_t _EmptyMask;
-    static const uint64_t _MyMask;
-    static const uint64_t _EnemyMask;
-    static const uint64_t _Pos0Mask;
 };
 
 const uint64_t SubGrid::_EmptyMask = 0b111111111;
-const uint64_t SubGrid::_MyMask = 0b111111111 << 9;
-const uint64_t SubGrid::_EnemyMask = 0b111111111 << 18;
-const uint64_t SubGrid::_Pos0Mask = 1 | (1 << 9) | (1 << 18);
 
 
 typedef array<Position, 81> movesBuffer_t;
