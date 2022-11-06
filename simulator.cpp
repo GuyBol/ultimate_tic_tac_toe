@@ -102,6 +102,9 @@ Player playGame(Player player)
 int main()
 {
     int runs = 20;
+    
+    Random::Init();
+    PositionMask::InitCache();
     int wins = 0;
     int losses = 0;
     int ties = 0;

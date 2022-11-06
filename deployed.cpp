@@ -100,6 +100,25 @@ struct Position
 class PositionMask
 {
 public:
+    static void InitCache()
+    {
+        for (uint64_t mask = 0; mask <= 0b111111111; mask++)
+        {
+            _Cache[mask] = {0,0,0,0,0,0,0,0,0,0};
+            _Cache[mask][9] = __builtin_popcountl(mask);
+            int index = 0;
+            int i = 0;
+            while (index < _Cache[mask][9])
+            {
+                if (mask & (0b100000000 >> i))
+                {
+                    _Cache[mask][index++] = 1 << (8-i);
+                }
+                i++;
+            }
+        }
+    }
+
     PositionMask(): _masks({0UL, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL, 0UL}), _subgrid(0)
     {}
 
@@ -125,7 +144,7 @@ public:
         int count = 0;
         for (uint64_t mask : _masks)
         {
-            count += __builtin_popcountl(mask);
+            count += _Cache[mask][9];
         }
         return count;
     }
@@ -140,11 +159,10 @@ public:
         {
             if (mask != 0)
             {
-                int bitsSetCount = __builtin_popcountl(mask);
+                int bitsSetCount = _Cache[mask][9];
                 if (index < bitsSetCount)
                 {
-                    unsigned int position = GetNthSetBit(mask, index);
-                    result.set(subGridId, 1UL << position);
+                    result.set(subGridId, GetNthSetBit(mask, index));
                     return result;
                 }
                 else
@@ -185,23 +203,12 @@ public:
         }
     }
 
-    // Get the nth set bit in a uint64_t starting from the left (most significant bit)
+    // Get a  mask with the nth set bit in a uint64_t starting from the left (most significant bit)
     // Return the position of this bit from the right
     // Warning: counts only amongst the last 9 bits
-    static unsigned int GetNthSetBit(uint64_t v, unsigned int r)
+    static unsigned int GetNthSetBit(uint64_t mask, unsigned int pos)
     {
-        int count = 0;
-        for (int i = 0; i < 9; i++)
-        {
-            if (v & (0b100000000 >> i))
-            {
-                if (count++ == r)
-                {
-                    return 8 - i;
-                }
-            }
-        }
-        return 0;
+        return _Cache[mask][pos];
     }
 
     // Get the nth set bit in a uint64_t starting from the left (most significant bit)
@@ -258,7 +265,14 @@ public:
 private:
     array<uint64_t, 9> _masks;
     int _subgrid; // The last subgrid in which a player was set
+
+    // Cache: array of all the possible subgrid masks
+    // For each subgrid mask, elements 0 to 9 are the mask of the nth bit set to 1;
+    // the 10th (index 9) is the count of 1s in this mask
+    static array<array<uint64_t, 10>, 512> _Cache;
 };
+
+array<array<uint64_t, 10>, 512> PositionMask::_Cache;
 
 
 class SubGrid
@@ -566,22 +580,6 @@ public:
     Player getWinner() const
     {
         // Check if the meta tic-tac-toe is won
-        /*if (getSubGrid(0,0).getWinner() != NONE && getSubGrid(0,0).getWinner() == getSubGrid(1,0).getWinner() && getSubGrid(0,0).getWinner() == getSubGrid(2,0).getWinner())
-            return getSubGrid(0,0).getWinner();
-        else if (getSubGrid(0,1).getWinner() != NONE && getSubGrid(0,1).getWinner() == getSubGrid(1,1).getWinner() && getSubGrid(0,1).getWinner() == getSubGrid(2,1).getWinner())
-            return getSubGrid(0,1).getWinner();
-        else if (getSubGrid(0,2).getWinner() != NONE && getSubGrid(0,2).getWinner() == getSubGrid(1,2).getWinner() && getSubGrid(0,2).getWinner() == getSubGrid(2,2).getWinner())
-            return getSubGrid(0,2).getWinner();
-        else if (getSubGrid(0,0).getWinner() != NONE && getSubGrid(0,0).getWinner() == getSubGrid(0,1).getWinner() && getSubGrid(0,0).getWinner() == getSubGrid(0,2).getWinner())
-            return getSubGrid(0,0).getWinner();
-        else if (getSubGrid(1,0).getWinner() != NONE && getSubGrid(1,0).getWinner() == getSubGrid(1,1).getWinner() && getSubGrid(1,0).getWinner() == getSubGrid(1,2).getWinner())
-            return getSubGrid(1,0).getWinner();
-        else if (getSubGrid(2,0).getWinner() != NONE && getSubGrid(2,0).getWinner() == getSubGrid(2,1).getWinner() && getSubGrid(2,0).getWinner() == getSubGrid(2,2).getWinner())
-            return getSubGrid(2,0).getWinner();
-        else if (getSubGrid(0,0).getWinner() != NONE && getSubGrid(0,0).getWinner() == getSubGrid(1,1).getWinner() && getSubGrid(0,0).getWinner() == getSubGrid(2,2).getWinner())
-            return getSubGrid(0,0).getWinner();
-        else if (getSubGrid(2,0).getWinner() != NONE && getSubGrid(2,0).getWinner() == getSubGrid(1,1).getWinner() && getSubGrid(2,0).getWinner() == getSubGrid(0,2).getWinner())
-            return getSubGrid(2,0).getWinner();*/
         if (getSubGrid(1,1).getWinner() != NONE)
         {
             if ((getSubGrid(1,1).getWinner() == getSubGrid(0,0).getWinner() && getSubGrid(1,1).getWinner() == getSubGrid(2,2).getWinner())
@@ -1005,19 +1003,15 @@ private:
 
     int simulation(TreeElem& treeElem)
     {
-        //static movesBuffer_t allowedMoves;
         Grid grid = treeElem.grid();
         Player player = treeElem.player();
         Player winner = grid.getWinner();
         while (winner == UNDEFINED)
         {
-            //int size = grid.getAllowedMoves(allowedMoves);
             PositionMask allowedMoves;
             grid.getAllowedMoves(allowedMoves);
-            //Position picked = allowedMoves[Random::Rand(size)];
             PositionMask picked = allowedMoves.getNthBitSet(Random::Rand(allowedMoves.countSetBits()));
             player = nextPlayer(player);
-            //grid.set(picked.x, picked.y, player);
             grid.set(picked, player);
             winner = grid.getWinner();
         }
@@ -1074,6 +1068,7 @@ private:
 int main()
 {
     Random::Init();
+    PositionMask::InitCache();
 
     Grid grid;
     AI ai(grid);

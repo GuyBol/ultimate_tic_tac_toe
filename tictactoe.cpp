@@ -135,21 +135,22 @@ bool testPositionMaskCounters()
     // Invalid if mask is 0, will always return 0
     assert(PositionMask::GetNthSetBit(0UL, 0) == 0);
     assert(PositionMask::GetNthSetBit(0UL, 1) == 0);
-    assert(PositionMask::GetNthSetBit(0b1, 0) == 0);
+    assert(PositionMask::GetNthSetBit(0b1, 0) == 0b1);
     // If not enough bits set, return 0
     assert(PositionMask::GetNthSetBit(0b1, 1) == 0);
-    assert(PositionMask::GetNthSetBit(0b101, 0) == 2);
-    assert(PositionMask::GetNthSetBit(0b101, 1) == 0);
-    assert(PositionMask::GetNthSetBit(0b101101101, 0) == 8);
-    assert(PositionMask::GetNthSetBit(0b101101101, 1) == 6);
-    assert(PositionMask::GetNthSetBit(0b101101101, 2) == 5);
-    assert(PositionMask::GetNthSetBit(0b101101101, 3) == 3);
-    assert(PositionMask::GetNthSetBit(0b101101101, 4) == 2);
-    assert(PositionMask::GetNthSetBit(0b101101101, 5) == 0);
+    assert(PositionMask::GetNthSetBit(0b101, 0) == 0b100);
+    assert(PositionMask::GetNthSetBit(0b101, 1) == 0b001);
+    assert(PositionMask::GetNthSetBit(0b101101101, 0) == 0b100000000);
+    assert(PositionMask::GetNthSetBit(0b101101101, 1) == 0b001000000);
+    assert(PositionMask::GetNthSetBit(0b101101101, 2) == 0b000100000);
+    assert(PositionMask::GetNthSetBit(0b101101101, 3) == 0b000001000);
+    assert(PositionMask::GetNthSetBit(0b101101101, 4) == 0b000000100);
+    assert(PositionMask::GetNthSetBit(0b101101101, 5) == 0b000000001);
 
     PositionMask pos;
     pos.set(0, 0b100100100);
     pos.set(4, 0b000111000);
+    assert(pos.countSetBits() == 6);
     PositionMask pos0 = pos.getNthBitSet(0);
     PositionMask pos1 = pos.getNthBitSet(1);
     PositionMask pos2 = pos.getNthBitSet(2);
@@ -362,6 +363,7 @@ bool testMctsPerf()
 int main()
 {
     Random::Init();
+    PositionMask::InitCache();
 
     G_myDisplay = "X";
     G_enemyDisplay = "O";
